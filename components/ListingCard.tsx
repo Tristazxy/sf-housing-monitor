@@ -1,5 +1,6 @@
 'use client';
 
+import { useState } from 'react';
 import { Listing } from '@/lib/types';
 import { formatDistanceToNow } from '@/lib/utils';
 
@@ -7,6 +8,7 @@ interface ListingCardProps {
   listing: Listing;
   isSeen: boolean;
   onSeen: (id: number) => void;
+  onSaveToggle?: (id: number, isSaved: boolean) => void;
 }
 
 const PLATFORM_COLORS: Record<string, string> = {
@@ -34,7 +36,9 @@ function formatPrice(price: number): string {
   }).format(price);
 }
 
-export default function ListingCard({ listing, isSeen, onSeen }: ListingCardProps) {
+export default function ListingCard({ listing, isSeen, onSeen, onSaveToggle }: ListingCardProps) {
+  const [saved, setSaved] = useState(listing.is_saved);
+  const [saving, setSaving] = useState(false);
   const isNew = listing.is_new;
   const platformColor = PLATFORM_COLORS[listing.platform] ?? 'bg-slate-700 text-slate-300';
   const platformLabel = PLATFORM_LABELS[listing.platform] ?? listing.platform;
@@ -48,6 +52,22 @@ export default function ListingCard({ listing, isSeen, onSeen }: ListingCardProp
   const handleClick = () => {
     onSeen(listing.id);
     window.open(listing.url, '_blank', 'noopener,noreferrer');
+  };
+
+  const handleSave = async (e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (saving) return;
+    setSaving(true);
+    try {
+      const res = await fetch(`/api/listings/${listing.id}/save`, { method: 'POST' });
+      if (res.ok) {
+        const data: { is_saved: boolean } = await res.json();
+        setSaved(data.is_saved);
+        onSaveToggle?.(listing.id, data.is_saved);
+      }
+    } finally {
+      setSaving(false);
+    }
   };
 
   return (
@@ -101,6 +121,22 @@ export default function ListingCard({ listing, isSeen, onSeen }: ListingCardProp
             <span className="text-slate-400 text-xs font-medium">Viewed</span>
           </div>
         )}
+
+        {/* Save / heart button */}
+        <button
+          onClick={handleSave}
+          disabled={saving}
+          className={`absolute bottom-2 right-2 w-8 h-8 rounded-full flex items-center justify-center transition-all shadow-lg ${
+            saved
+              ? 'bg-red-500 text-white'
+              : 'bg-slate-900/70 text-slate-300 hover:bg-slate-700/90 hover:text-red-400'
+          }`}
+          title={saved ? 'Remove from saved' : 'Save listing'}
+        >
+          <svg className="w-4 h-4" fill={saved ? 'currentColor' : 'none'} viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+            <path strokeLinecap="round" strokeLinejoin="round" d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z" />
+          </svg>
+        </button>
       </div>
 
       {/* Content */}

@@ -54,6 +54,13 @@ function initSchema(db: Database.Database) {
       value TEXT NOT NULL
     );
   `);
+
+  // Add is_saved column if it doesn't exist yet (migration)
+  try {
+    db.exec(`ALTER TABLE listings ADD COLUMN is_saved INTEGER NOT NULL DEFAULT 0`);
+  } catch {
+    // Column already exists — ignore
+  }
 }
 
 export function getSettings(): Settings {
@@ -143,9 +150,9 @@ export function getListings(filters?: {
     conditions.push('(baths IS NULL OR baths >= ?)');
     params.push(filters.baths_min);
   }
-  if (filters?.require_laundry) {
-    conditions.push('has_laundry = 1');
-  }
+  // Always require in-unit laundry
+  conditions.push('has_laundry = 1');
+
   // Always exclude high-crime neighborhoods
   const EXCLUDED_NEIGHBORHOODS = ['Tenderloin', 'Civic', 'Van Ness', 'Visitacion Valley', 'Excelsior', 'Bayview'];
   const excludePlaceholders = EXCLUDED_NEIGHBORHOODS.map(() => '?').join(', ');
@@ -176,6 +183,7 @@ export function getListings(filters?: {
     has_view: Boolean(row.has_view),
     is_sublease: Boolean(row.is_sublease),
     is_new: Boolean(row.is_new),
+    is_saved: Boolean(row.is_saved),
   })) as Listing[];
 }
 
@@ -230,6 +238,29 @@ export function upsertListings(listings: Omit<Listing, 'id' | 'scraped_at' | 'is
 
   insertMany(listings);
   return inserted;
+}
+
+export function toggleSavedListing(id: number): boolean {
+  const db = getDb();
+  const row = db.prepare('SELECT is_saved FROM listings WHERE id = ?').get(id) as { is_saved: number } | undefined;
+  if (!row) return false;
+  const newVal = row.is_saved ? 0 : 1;
+  db.prepare('UPDATE listings SET is_saved = ? WHERE id = ?').run(newVal, id);
+  return Boolean(newVal);
+}
+
+export function getSavedListings(): Listing[] {
+  const db = getDb();
+  const rows = db.prepare('SELECT * FROM listings WHERE is_saved = 1 ORDER BY scraped_at DESC').all() as Record<string, unknown>[];
+  return rows.map(row => ({
+    ...row,
+    has_laundry: Boolean(row.has_laundry),
+    has_parking: Boolean(row.has_parking),
+    has_view: Boolean(row.has_view),
+    is_sublease: Boolean(row.is_sublease),
+    is_new: Boolean(row.is_new),
+    is_saved: Boolean(row.is_saved),
+  })) as Listing[];
 }
 
 export function getListingCount(): number {

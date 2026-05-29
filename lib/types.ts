@@ -19,6 +19,7 @@ export interface Listing {
   posted_at: string | null;
   scraped_at: string;
   is_new: boolean;
+  is_saved: boolean;
 }
 
 export interface Settings {
