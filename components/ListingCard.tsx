@@ -82,7 +82,7 @@ export default function ListingCard({ listing, isSeen, onSeen, onSaveToggle }: L
         {listing.image_url ? (
           // eslint-disable-next-line @next/next/no-img-element
           <img
-            src={listing.image_url}
+            src={`/api/image-proxy?url=${encodeURIComponent(listing.image_url)}`}
             alt={listing.title}
             className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
             onError={(e) => {
