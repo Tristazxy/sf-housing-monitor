@@ -32,7 +32,7 @@ export async function scrapeHotpads(): Promise<{ listings: ListingRow[]; error?:
   const listings: ListingRow[] = [];
 
   try {
-    const apiUrl = 'https://hotpads.com/san-francisco-ca/apartments-for-rent?beds=1&maxPrice=4000&rental=true';
+    const apiUrl = 'https://hotpads.com/san-francisco-ca/apartments-for-rent?beds=1&maxPrice=4000&rental=true&laundry=in-unit';
 
     const html = browserGetHtml(apiUrl);
     const $ = cheerio.load(html);
@@ -79,7 +79,7 @@ export async function scrapeHotpads(): Promise<{ listings: ListingRow[]; error?:
           address: String((item.address as Record<string, unknown>)?.street ?? title),
           neighborhood,
           floor: amenities.floor,
-          has_laundry: amenities.has_laundry,
+          has_laundry: true, // URL filtered with laundry=in-unit
           has_parking: amenities.has_parking,
           has_view: amenities.has_view,
           is_sublease: false,
@@ -119,7 +119,7 @@ export async function scrapeHotpads(): Promise<{ listings: ListingRow[]; error?:
           address: title,
           neighborhood: extractNeighborhood(title),
           floor: null,
-          has_laundry: false,
+          has_laundry: true, // URL filtered with laundry=in-unit
           has_parking: false,
           has_view: false,
           is_sublease: false,

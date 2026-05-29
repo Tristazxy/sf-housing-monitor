@@ -166,8 +166,10 @@ export function getListings(filters?: {
     conditions.push('(baths IS NULL OR baths >= ?)');
     params.push(filters.baths_min);
   }
-  // Always require in-unit laundry
-  conditions.push('has_laundry = 1');
+  // Laundry: filter only when setting is explicitly true
+  if (filters?.require_laundry) {
+    conditions.push('has_laundry = 1');
+  }
 
   // Always exclude high-crime neighborhoods
   const EXCLUDED_NEIGHBORHOODS = ['Tenderloin', 'Civic', 'Van Ness', 'Visitacion Valley', 'Excelsior', 'Bayview'];

@@ -32,7 +32,7 @@ export async function scrapeApartments(): Promise<{ listings: ListingRow[]; erro
   const listings: ListingRow[] = [];
 
   try {
-    const url = 'https://www.apartments.com/san-francisco-ca/1-bedrooms-under-4000/';
+    const url = 'https://www.apartments.com/san-francisco-ca/1-bedrooms-under-4000/?so=2&wr-dr=1';
     const html = browserGetHtml(url);
     const $ = cheerio.load(html);
 
@@ -82,7 +82,7 @@ export async function scrapeApartments(): Promise<{ listings: ListingRow[]; erro
         address,
         neighborhood,
         floor: amenities.floor,
-        has_laundry: amenities.has_laundry,
+        has_laundry: true, // URL filtered with washer/dryer in unit
         has_parking: amenities.has_parking,
         has_view: amenities.has_view,
         is_sublease: false,
@@ -114,7 +114,7 @@ export async function scrapeApartments(): Promise<{ listings: ListingRow[]; erro
                 address: item.address?.streetAddress ?? null,
                 neighborhood: extractNeighborhood(item.address?.addressLocality ?? ''),
                 floor: null,
-                has_laundry: false,
+                has_laundry: true, // URL filtered with washer/dryer in unit
                 has_parking: false,
                 has_view: false,
                 is_sublease: false,

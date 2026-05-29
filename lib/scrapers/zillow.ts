@@ -33,7 +33,7 @@ export async function scrapeZillow(): Promise<{ listings: ListingRow[]; error?: 
   const listings: ListingRow[] = [];
 
   try {
-    const url = 'https://www.zillow.com/san-francisco-ca/rentals/?price=0-4000&beds=0-1';
+    const url = 'https://www.zillow.com/san-francisco-ca/rentals/?price=0-4000&beds=0-1&amenities=laundryInUnit';
 
     const html = browserGetHtml(url);
     const $ = cheerio.load(html);
@@ -77,7 +77,7 @@ export async function scrapeZillow(): Promise<{ listings: ListingRow[]; error?: 
           address: result.address ?? null,
           neighborhood,
           floor: amenities.floor,
-          has_laundry: amenities.has_laundry,
+          has_laundry: true, // URL filtered with amenities=laundryInUnit
           has_parking: amenities.has_parking,
           has_view: amenities.has_view,
           is_sublease: false,
@@ -122,7 +122,7 @@ export async function scrapeZillow(): Promise<{ listings: ListingRow[]; error?: 
           address: title,
           neighborhood: extractNeighborhood(title),
           floor: null,
-          has_laundry: false,
+          has_laundry: true, // URL filtered with amenities=laundryInUnit
           has_parking: false,
           has_view: false,
           is_sublease: false,

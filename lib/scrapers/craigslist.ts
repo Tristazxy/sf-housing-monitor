@@ -1,13 +1,7 @@
 import { Listing } from '../types';
-import { browserNavigate, browserGetText, browserGetLinks, browserRunJS, browserSleep } from '../browser-scraper';
+import { browserNavigate, browserGetText, browserGetLinks, browserGetCurrentHtml, browserRunJS, browserSleep } from '../browser-scraper';
 
 type ListingRow = Omit<Listing, 'id' | 'scraped_at' | 'is_new'>;
-
-function parsePrice(text: string): number | null {
-  const m = text.match(/\$?([\d,]+)/);
-  if (!m) return null;
-  return parseInt(m[1].replace(/,/g, ''));
-}
 
 function detectAmenities(text: string) {
   const lower = text.toLowerCase();
@@ -47,50 +41,71 @@ function extractNeighborhood(text: string): string | null {
   return null;
 }
 
-/** Extract post-ID → image-URL map. Uses data-pid attribute which is stable. */
-function extractImageMapFromJS(): Map<string, string> {
-  // Strategy 1: use data-pid attribute on each gallery item
-  const js1 = `JSON.stringify(Array.from(document.querySelectorAll('[data-pid]')).reduce((m,el)=>{const pid=el.getAttribute('data-pid');if(!pid)return m;const img=el.querySelector('img');if(img){const src=img.src||img.getAttribute('data-src')||'';if(src.includes('craigslist'))m[pid]=src;}return m;},{}))`;
-  try {
-    const raw = browserRunJS(js1);
-    const parsed = JSON.parse(raw) as Record<string, string>;
-    if (Object.keys(parsed).length > 0) return new Map(Object.entries(parsed));
-  } catch { /* fall through */ }
-
-  // Strategy 2: any craigslist img src keyed by closest ancestor href
-  const js2 = `JSON.stringify(Array.from(document.querySelectorAll("img[src*='craigslist.org']")).reduce((m,img)=>{const a=img.closest('a[href*="/d/"]');if(a)m[a.href]=img.src;return m;},{}))`;
-  try {
-    const raw = browserRunJS(js2);
-    const parsed = JSON.parse(raw) as Record<string, string>;
-    if (Object.keys(parsed).length > 0) return new Map(Object.entries(parsed));
-  } catch { /* fall through */ }
-
-  return new Map();
-}
-
 /** Extract post ID from a Craigslist URL like .../d/title-words-7654321.html */
 function extractPostId(url: string): string | null {
   const m = url.match(/(\d{7,13})\.html$/);
   return m ? m[1] : null;
 }
 
+/**
+ * Build a postId → imageUrl map by parsing the rendered HTML.
+ * Looks for data-pid="..." then finds the nearest images.craigslist.org URL within 4KB.
+ * Falls back to JS-based extraction if HTML parsing yields nothing.
+ */
+function buildImageMap(): Map<string, string> {
+  const map = new Map<string, string>();
+
+  // Primary: HTML regex — most reliable, no JS evaluation needed
+  try {
+    const html = browserGetCurrentHtml();
+    // Match data-pid then scan up to 4000 chars for a craigslist image URL
+    const re = /data-pid="(\d+)"[\s\S]{0,4000}?(https?:\/\/images\.craigslist\.org\/[^\s"'<>]+)/g;
+    let m: RegExpExecArray | null;
+    while ((m = re.exec(html)) !== null) {
+      const pid = m[1];
+      const imgUrl = m[2].trim();
+      if (!map.has(pid) && imgUrl.length > 20) map.set(pid, imgUrl);
+    }
+    if (map.size > 0) return map;
+  } catch { /* fall through */ }
+
+  // Fallback: JS DOM query for data-pid
+  try {
+    const js = `JSON.stringify(Array.from(document.querySelectorAll('[data-pid]')).reduce((m,el)=>{const pid=el.getAttribute('data-pid');if(!pid)return m;const img=el.querySelector('img');if(img){const src=img.src||img.getAttribute('data-src')||img.getAttribute('src')||'';if(src&&src.includes('craigslist'))m[pid]=src;}return m;},{}))`;
+    const raw = browserRunJS(js);
+    const parsed = JSON.parse(raw) as Record<string, string>;
+    if (Object.keys(parsed).length > 0) return new Map(Object.entries(parsed));
+  } catch { /* fall through */ }
+
+  // Last resort: JS — any craigslist img by link href
+  try {
+    const js2 = `JSON.stringify(Array.from(document.querySelectorAll("img[src*='craigslist.org']")).reduce((m,img)=>{const a=img.closest('a[href*="/d/"]');if(a)m[a.href]=img.src;return m;},{}))`;
+    const raw = browserRunJS(js2);
+    const parsed = JSON.parse(raw) as Record<string, string>;
+    if (Object.keys(parsed).length > 0) return new Map(Object.entries(parsed));
+  } catch { /* fall through */ }
+
+  return map;
+}
+
 async function scrapeSearchPage(url: string, isSublease: boolean): Promise<ListingRow[]> {
   browserNavigate(url);
 
-  // Scroll to trigger lazy image loading across the full page
+  // Scroll to trigger lazy image loading
   try {
     browserRunJS('window.scrollTo(0, document.body.scrollHeight * 0.33)');
-    browserSleep(400);
+    browserSleep(500);
     browserRunJS('window.scrollTo(0, document.body.scrollHeight * 0.66)');
-    browserSleep(400);
+    browserSleep(500);
     browserRunJS('window.scrollTo(0, document.body.scrollHeight)');
-    browserSleep(600);
+    browserSleep(800);
     browserRunJS('window.scrollTo(0, 0)');
+    browserSleep(300);
   } catch { /* scroll errors are non-fatal */ }
 
   const links = browserGetLinks();
   const text = browserGetText();
-  const imageMap = extractImageMapFromJS();
+  const imageMap = buildImageMap();
 
   // Filter to actual listing links (e.g. /sfc/apa/d/... or /sfc/sub/d/...)
   const listingLinks = links.filter(l =>
@@ -105,30 +120,48 @@ async function scrapeSearchPage(url: string, isSublease: boolean): Promise<Listi
 
     // Find this title in the text blob to extract price/metadata
     const escaped = rawTitle.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-    const re = new RegExp(escaped + '[\\s\\S]{0,200}?\\$(\\d[\\d,]+)', 'i');
+    const re = new RegExp(escaped + '[\\s\\S]{0,250}?\\$(\\d[\\d,]+)', 'i');
     const m = text.match(re);
     if (!m) continue;
 
     const price = parseInt(m[1].replace(/,/g, ''));
     if (!price || price < 100 || price > 15000) continue;
 
-    const section = m[0]; // full matched chunk: title + metadata + price
+    const section = m[0];
 
-    // Beds
-    const bedsMatch = section.match(/(\d+)br/i) || rawTitle.match(/(\d+)\s*(?:br|bed)/i);
+    // Beds — match "2br", "2 bed", "2bd", "2b/1b" patterns, cap at 10
     const isStudio = /studio/i.test(rawTitle) || /studio/i.test(section.slice(0, 80));
-    const beds = isStudio ? 0 : (bedsMatch ? parseInt(bedsMatch[1]) : null);
+    let beds: number | null = null;
+    if (isStudio) {
+      beds = 0;
+    } else {
+      const bm =
+        section.match(/\b(\d)\s*br\b/i) ||
+        rawTitle.match(/\b(\d)\s*(?:br|bed(?:room)?s?)\b/i) ||
+        section.match(/\b(\d)\s*b(?:ed(?:room)?s?)?\s*\/\s*\d/i) ||
+        section.match(/\b(\d)\s*(?:bedroom|bed)\b/i);
+      if (bm) {
+        const n = parseInt(bm[1]);
+        beds = n <= 10 ? n : null;
+      }
+    }
 
-    // Sqft
-    const sqftMatch = section.match(/(\d{3,4})ft2/i);
+    // Sqft — 3-4 digit number followed by ft2/sqft
+    const sqftMatch = section.match(/(\d{3,4})\s*(?:ft2|sq\s*ft|sqft)/i);
     const sqft = sqftMatch ? parseInt(sqftMatch[1]) : null;
 
     const amenities = detectAmenities(rawTitle + ' ' + section);
     const neighborhood = extractNeighborhood(section) || extractNeighborhood(rawTitle);
-    const baths = parseBaths(rawTitle);
+    const baths = parseBaths(section) ?? parseBaths(rawTitle);
 
-    // Clean title: strip leading "no image" artifacts
     const title = rawTitle.replace(/^no\s+image\s*/i, '').trim() || rawTitle;
+
+    // Look up image by post ID (most reliable) or full URL
+    const postId = extractPostId(link.href);
+    const image_url =
+      (postId ? imageMap.get(postId) : null) ??
+      imageMap.get(link.href) ??
+      null;
 
     listings.push({
       url: link.href,
@@ -140,14 +173,12 @@ async function scrapeSearchPage(url: string, isSublease: boolean): Promise<Listi
       address: null,
       neighborhood,
       floor: amenities.floor,
-      has_laundry: true, // Craigslist URL filtered with laundry=1
+      has_laundry: true, // URL filtered with laundry=1
       has_parking: amenities.has_parking,
       has_view: amenities.has_view,
       is_sublease: isSublease,
       platform: 'craigslist',
-      image_url: imageMap.get(link.href)
-        ?? (extractPostId(link.href) ? imageMap.get(extractPostId(link.href)!) : null)
-        ?? null,
+      image_url,
       description: null,
       posted_at: null,
     });
@@ -161,7 +192,6 @@ export async function scrapeCraigslist(): Promise<{ listings: ListingRow[]; erro
   const errors: string[] = [];
 
   try {
-    // laundry=1 = W/D in unit; private_room=0 = no single-room listings
     const apaListings = await scrapeSearchPage(
       'https://sfbay.craigslist.org/search/sfc/apa?min_bedrooms=0&max_price=4000&sort=date&laundry=1&private_room=0',
       false
