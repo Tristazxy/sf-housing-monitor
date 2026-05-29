@@ -61,6 +61,22 @@ function initSchema(db: Database.Database) {
   } catch {
     // Column already exists — ignore
   }
+
+  // Purge any non-SF listings already in the DB
+  const nonSFCities = [
+    'Oakland', 'Berkeley', 'Emeryville', 'Alameda', 'San Leandro', 'Hayward',
+    'Fremont', 'Union City', 'Newark', 'Milpitas',
+    'San Jose', 'Santa Clara', 'Sunnyvale', 'Mountain View', 'Palo Alto',
+    'Menlo Park', 'Redwood City', 'San Mateo', 'Burlingame', 'Millbrae',
+    'South San Francisco', 'Brisbane', 'Daly City', 'Pacifica',
+    'Sausalito', 'Tiburon', 'Corte Madera', 'San Rafael', 'Novato',
+    'Walnut Creek', 'Concord', 'Livermore', 'Pleasanton', 'Dublin', 'San Ramon',
+  ];
+  for (const city of nonSFCities) {
+    db.prepare(
+      `DELETE FROM listings WHERE (address LIKE ? OR address LIKE ?) AND is_saved = 0`
+    ).run(`%${city}, CA%`, `%${city},CA%`);
+  }
 }
 
 export function getSettings(): Settings {

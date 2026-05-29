@@ -47,16 +47,31 @@ function extractNeighborhood(text: string): string | null {
   return null;
 }
 
+/** Extract post-ID → image-URL map. Uses data-pid attribute which is stable. */
 function extractImageMapFromJS(): Map<string, string> {
-  // Use JS to query DOM directly — captures lazy-loaded images too
-  const js = `JSON.stringify(Array.from(document.querySelectorAll("a.main[href*='/d/']")).reduce((m, a) => { const img = a.querySelector("img"); if (img?.src && img.src.includes("craigslist.org")) m[a.href] = img.src; return m; }, {}))`;
+  // Strategy 1: use data-pid attribute on each gallery item
+  const js1 = `JSON.stringify(Array.from(document.querySelectorAll('[data-pid]')).reduce((m,el)=>{const pid=el.getAttribute('data-pid');if(!pid)return m;const img=el.querySelector('img');if(img){const src=img.src||img.getAttribute('data-src')||'';if(src.includes('craigslist'))m[pid]=src;}return m;},{}))`;
   try {
-    const raw = browserRunJS(js);
+    const raw = browserRunJS(js1);
     const parsed = JSON.parse(raw) as Record<string, string>;
-    return new Map(Object.entries(parsed));
-  } catch {
-    return new Map();
-  }
+    if (Object.keys(parsed).length > 0) return new Map(Object.entries(parsed));
+  } catch { /* fall through */ }
+
+  // Strategy 2: any craigslist img src keyed by closest ancestor href
+  const js2 = `JSON.stringify(Array.from(document.querySelectorAll("img[src*='craigslist.org']")).reduce((m,img)=>{const a=img.closest('a[href*="/d/"]');if(a)m[a.href]=img.src;return m;},{}))`;
+  try {
+    const raw = browserRunJS(js2);
+    const parsed = JSON.parse(raw) as Record<string, string>;
+    if (Object.keys(parsed).length > 0) return new Map(Object.entries(parsed));
+  } catch { /* fall through */ }
+
+  return new Map();
+}
+
+/** Extract post ID from a Craigslist URL like .../d/title-words-7654321.html */
+function extractPostId(url: string): string | null {
+  const m = url.match(/(\d{7,13})\.html$/);
+  return m ? m[1] : null;
 }
 
 async function scrapeSearchPage(url: string, isSublease: boolean): Promise<ListingRow[]> {
@@ -130,7 +145,9 @@ async function scrapeSearchPage(url: string, isSublease: boolean): Promise<Listi
       has_view: amenities.has_view,
       is_sublease: isSublease,
       platform: 'craigslist',
-      image_url: imageMap.get(link.href) ?? null,
+      image_url: imageMap.get(link.href)
+        ?? (extractPostId(link.href) ? imageMap.get(extractPostId(link.href)!) : null)
+        ?? null,
       description: null,
       posted_at: null,
     });
