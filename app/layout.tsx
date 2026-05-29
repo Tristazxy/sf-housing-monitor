@@ -8,6 +8,9 @@ const inter = Inter({ subsets: ['latin'] });
 export const metadata: Metadata = {
   title: 'SF Housing Monitor',
   description: 'Track SF rental listings across Craigslist, Zillow, Apartments.com and more',
+  icons: {
+    icon: '/icon.svg',
+  },
 };
 
 export default function RootLayout({
