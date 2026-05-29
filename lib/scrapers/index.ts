@@ -103,6 +103,9 @@ export async function runAllScrapers(): Promise<ScrapeResult[]> {
 
 export function deduplicateListings(allResults: ScrapeResult[]): ListingRow[] {
   const seen = new Set<string>();
+  // Tracks how many listings per (price, beds, neighborhood) — caps same-building spam
+  const groupCount = new Map<string, number>();
+  const MAX_PER_GROUP = 3;
   const deduped: ListingRow[] = [];
 
   // Sort results: prefer craigslist first (most reliable), then others
@@ -118,10 +121,16 @@ export function deduplicateListings(allResults: ScrapeResult[]): ListingRow[] {
 
       // Normalize URL for deduplication
       const normalizedUrl = listing.url.replace(/\?.*$/, '').replace(/\/$/, '').toLowerCase();
-      if (!seen.has(normalizedUrl)) {
-        seen.add(normalizedUrl);
-        deduped.push(listing);
-      }
+      if (seen.has(normalizedUrl)) continue;
+      seen.add(normalizedUrl);
+
+      // Cap same-building spam: max 3 listings per (price, beds, neighborhood) combo
+      const groupKey = `${listing.price}|${listing.beds ?? 'null'}|${listing.neighborhood ?? 'null'}`;
+      const count = groupCount.get(groupKey) ?? 0;
+      if (count >= MAX_PER_GROUP) continue;
+      groupCount.set(groupKey, count + 1);
+
+      deduped.push(listing);
     }
   }
 
