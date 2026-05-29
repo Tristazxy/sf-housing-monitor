@@ -198,15 +198,6 @@ export default function ListingCard({ listing, isSeen, onSeen, onSaveToggle }: L
 
         {/* Amenity badges */}
         <div className="flex flex-wrap gap-1.5 mb-3">
-          {listing.has_laundry && (
-            <span className="inline-flex items-center gap-1 text-xs bg-blue-500/10 text-blue-400 border border-blue-500/20 px-2 py-0.5 rounded-full">
-              <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <circle cx="12" cy="12" r="9" strokeWidth="2" />
-                <circle cx="12" cy="12" r="4" strokeWidth="2" />
-              </svg>
-              Laundry
-            </span>
-          )}
           {listing.has_parking && (
             <span className="inline-flex items-center gap-1 text-xs bg-green-500/10 text-green-400 border border-green-500/20 px-2 py-0.5 rounded-full">
               <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">

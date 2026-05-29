@@ -39,15 +39,16 @@ export async function scrapePadmapper(): Promise<{ listings: ListingRow[]; error
 
   try {
     // PadMapper has a public API endpoint
+    // Bounding box tightly scoped to SF city limits only
     const apiUrl = 'https://www.padmapper.com/api/t/1/listings?' +
       new URLSearchParams({
         'limit': '50',
         'min_beds': '1',
         'max_price': '4000',
-        'min_lat': '37.7013',
-        'max_lat': '37.8365',
-        'min_lng': '-122.5328',
-        'max_lng': '-122.3482',
+        'min_lat': '37.7080',
+        'max_lat': '37.8121',
+        'min_lng': '-122.5149',
+        'max_lng': '-122.3558',
         'cats': '0',
         'dogs': '0',
       }).toString();

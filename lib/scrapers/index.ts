@@ -8,6 +8,39 @@ import { ScrapeResult, Listing } from '../types';
 
 type ListingRow = Omit<Listing, 'id' | 'scraped_at' | 'is_new'>;
 
+// Cities that are NOT San Francisco — reject listings whose address names these
+const NON_SF_CITIES = [
+  'oakland', 'berkeley', 'emeryville', 'alameda', 'san leandro', 'hayward',
+  'fremont', 'union city', 'newark', 'milpitas',
+  'san jose', 'santa clara', 'sunnyvale', 'mountain view', 'palo alto',
+  'menlo park', 'redwood city', 'san mateo', 'burlingame', 'millbrae',
+  'south san francisco', 'brisbane', 'daly city', 'pacifica', 'half moon bay',
+  'sausalito', 'tiburon', 'corte madera', 'san rafael', 'novato',
+  'walnut creek', 'concord', 'pittsburg', 'antioch', 'brentwood',
+  'livermore', 'pleasanton', 'dublin', 'san ramon',
+  // Richmond CA (the city) — but NOT "Richmond District" which is an SF neighborhood
+  'richmond, ca', 'richmond ca',
+];
+
+/**
+ * Returns true if the listing is in San Francisco proper.
+ * If no address is available, we trust the scraper's search URL and accept it.
+ */
+function isSFListing(listing: ListingRow): boolean {
+  const text = [listing.address, listing.title].filter(Boolean).join(' ').toLowerCase();
+  if (!text) return true;
+
+  // Explicit SF mention → accept immediately
+  if (/\bsan francisco\b|,\s*sf\b/.test(text)) return true;
+
+  // Non-SF city found in the address/title → reject
+  for (const city of NON_SF_CITIES) {
+    if (text.includes(city)) return false;
+  }
+
+  return true;
+}
+
 async function runScraper(
   name: string,
   fn: () => Promise<{ listings: ListingRow[]; error?: string }>
@@ -74,6 +107,9 @@ export function deduplicateListings(allResults: ScrapeResult[]): ListingRow[] {
 
   for (const result of sorted) {
     for (const listing of result.listings) {
+      // Reject listings outside San Francisco city limits
+      if (!isSFListing(listing)) continue;
+
       // Normalize URL for deduplication
       const normalizedUrl = listing.url.replace(/\?.*$/, '').replace(/\/$/, '').toLowerCase();
       if (!seen.has(normalizedUrl)) {
