@@ -24,18 +24,24 @@ const NON_SF_CITIES = [
 
 /**
  * Returns true if the listing is in San Francisco proper.
- * If no address is available, we trust the scraper's search URL and accept it.
+ * Checks address, title, and URL slug.
  */
 function isSFListing(listing: ListingRow): boolean {
   const text = [listing.address, listing.title].filter(Boolean).join(' ').toLowerCase();
-  if (!text) return true;
 
-  // Explicit SF mention → accept immediately
+  // Explicit SF mention in text → accept immediately
   if (/\bsan francisco\b|,\s*sf\b/.test(text)) return true;
 
   // Non-SF city found in the address/title → reject
   for (const city of NON_SF_CITIES) {
     if (text.includes(city)) return false;
+  }
+
+  // Also check URL slug — catches "fremont-in-unit-..." style CL titles
+  const urlSlug = listing.url.toLowerCase();
+  for (const city of NON_SF_CITIES) {
+    if (urlSlug.includes(city.replace(/\s+/g, '-'))) return false;
+    if (urlSlug.includes(city.replace(/\s+/g, '_'))) return false;
   }
 
   return true;

@@ -93,7 +93,7 @@ async function scrapeSubreddit(subreddit: string): Promise<ListingRow[]> {
       address: null,
       neighborhood,
       floor: null,
-      has_laundry: amenities.has_laundry,
+      has_laundry: amenities.has_laundry || true, // default true for SF housing subreddits
       has_parking: amenities.has_parking,
       has_view: amenities.has_view,
       is_sublease: isSublease,

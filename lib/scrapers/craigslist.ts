@@ -48,43 +48,23 @@ function extractPostId(url: string): string | null {
 }
 
 /**
- * Build a postId → imageUrl map by parsing the rendered HTML.
- * Looks for data-pid="..." then finds the nearest images.craigslist.org URL within 4KB.
- * Falls back to JS-based extraction if HTML parsing yields nothing.
+ * Build a postId → imageUrl map from the rendered HTML.
+ * Craigslist image URLs embed the post ID: images.craigslist.org/d/{pid}/...
+ * So we just scan the HTML for those URLs — no need to find data-pid separately.
  */
 function buildImageMap(): Map<string, string> {
   const map = new Map<string, string>();
-
-  // Primary: HTML regex — most reliable, no JS evaluation needed
   try {
     const html = browserGetCurrentHtml();
-    // Match data-pid then scan up to 4000 chars for a craigslist image URL
-    const re = /data-pid="(\d+)"[\s\S]{0,4000}?(https?:\/\/images\.craigslist\.org\/[^\s"'<>]+)/g;
+    // The post ID is directly in the image URL path: /d/{pid}/filename.jpg
+    const re = /(https:\/\/images\.craigslist\.org\/d\/(\d+)\/[^\s"'<>]+)/g;
     let m: RegExpExecArray | null;
     while ((m = re.exec(html)) !== null) {
-      const pid = m[1];
-      const imgUrl = m[2].trim();
-      if (!map.has(pid) && imgUrl.length > 20) map.set(pid, imgUrl);
+      const fullUrl = m[1];
+      const pid = m[2];
+      if (!map.has(pid)) map.set(pid, fullUrl);
     }
-    if (map.size > 0) return map;
-  } catch { /* fall through */ }
-
-  // Fallback: JS DOM query for data-pid
-  try {
-    const js = `JSON.stringify(Array.from(document.querySelectorAll('[data-pid]')).reduce((m,el)=>{const pid=el.getAttribute('data-pid');if(!pid)return m;const img=el.querySelector('img');if(img){const src=img.src||img.getAttribute('data-src')||img.getAttribute('src')||'';if(src&&src.includes('craigslist'))m[pid]=src;}return m;},{}))`;
-    const raw = browserRunJS(js);
-    const parsed = JSON.parse(raw) as Record<string, string>;
-    if (Object.keys(parsed).length > 0) return new Map(Object.entries(parsed));
-  } catch { /* fall through */ }
-
-  // Last resort: JS — any craigslist img by link href
-  try {
-    const js2 = `JSON.stringify(Array.from(document.querySelectorAll("img[src*='craigslist.org']")).reduce((m,img)=>{const a=img.closest('a[href*="/d/"]');if(a)m[a.href]=img.src;return m;},{}))`;
-    const raw = browserRunJS(js2);
-    const parsed = JSON.parse(raw) as Record<string, string>;
-    if (Object.keys(parsed).length > 0) return new Map(Object.entries(parsed));
-  } catch { /* fall through */ }
-
+  } catch { /* non-fatal */ }
   return map;
 }
 
