@@ -1,4 +1,3 @@
-import * as cheerio from 'cheerio';
 import { Listing } from '../types';
 
 type ListingRow = Omit<Listing, 'id' | 'scraped_at' | 'is_new'>;
@@ -10,13 +9,12 @@ const HEADERS = {
   'Referer': 'https://www.padmapper.com/',
 };
 
-function detectAmenities(text: string): { has_laundry: boolean; has_parking: boolean; has_view: boolean; floor: number | null } {
+function detectAmenities(text: string): { has_laundry: boolean; has_parking: boolean; has_view: boolean } {
   const lower = text.toLowerCase();
   return {
-    has_laundry: /in.?unit laundry|washer.?dryer|w\/d/.test(lower),
+    has_laundry: /in.?unit laundry|washer.?dryer|w\/d|in-apartment laundry|washing machine.*dryer|dryer.*washing machine/.test(lower),
     has_parking: /parking|garage/.test(lower),
     has_view: /bay view|city view|view/.test(lower),
-    floor: null,
   };
 }
 
@@ -34,167 +32,102 @@ function extractNeighborhood(text: string): string | null {
   return null;
 }
 
+interface PadMapperListing {
+  listing_id: number;
+  url: string;
+  title: string | null;
+  description: string | null;
+  min_price: number;
+  max_price: number;
+  bedrooms: number | null;
+  bathrooms: number | null;
+  media: Array<{ media_id: number; media_type: number; width: number; height: number; is_available: boolean }>;
+  amenities: number[];
+  building_amenities: number[];
+  neighborhood: { name: string } | null;
+  building_name: string | null;
+  listed_on: number | null;
+}
+
 export async function scrapePadmapper(): Promise<{ listings: ListingRow[]; error?: string }> {
   const listings: ListingRow[] = [];
 
   try {
-    // PadMapper has a public API endpoint
+    // PadMapper API requires POST with JSON body
     // Bounding box tightly scoped to SF city limits only
-    const apiUrl = 'https://www.padmapper.com/api/t/1/listings?' +
-      new URLSearchParams({
-        'limit': '50',
-        'min_beds': '1',
-        'max_price': '4000',
-        'min_lat': '37.7080',
-        'max_lat': '37.8121',
-        'min_lng': '-122.5149',
-        'max_lng': '-122.3558',
-        'cats': '0',
-        'dogs': '0',
-      }).toString();
-
-    const response = await fetch(apiUrl, {
+    const response = await fetch('https://www.padmapper.com/api/t/1/listings', {
+      method: 'POST',
       headers: {
         ...HEADERS,
-        'Accept': 'application/json',
+        'Content-Type': 'application/json',
       },
+      body: JSON.stringify({
+        limit: 50,
+        min_beds: 1,
+        max_price: 4000,
+        min_lat: 37.7080,
+        max_lat: 37.8121,
+        min_lng: -122.5149,
+        max_lng: -122.3558,
+      }),
     });
 
     if (!response.ok) {
-      // Fallback to HTML scrape
-      return scrapePadmapperHtml();
+      return { listings: [], error: `PadMapper API returned HTTP ${response.status}` };
     }
 
-    const contentType = response.headers.get('content-type') ?? '';
-    if (!contentType.includes('json')) {
-      return scrapePadmapperHtml();
+    const items = await response.json() as PadMapperListing[];
+    if (!Array.isArray(items)) {
+      return { listings: [], error: 'PadMapper API returned unexpected format' };
     }
-
-    const data = await response.json() as Record<string, unknown>;
-
-    const items: Record<string, unknown>[] = Array.isArray(data)
-      ? data as Record<string, unknown>[]
-      : (data.data as Record<string, unknown>[]) ?? (data.listings as Record<string, unknown>[]) ?? [];
 
     for (const item of items.slice(0, 50)) {
-      const priceStr = (item.price ?? item.min_price ?? item.rent) as string | number | undefined;
-      const price = parseInt(String(priceStr ?? '0').replace(/[^0-9]/g, ''));
-      if (isNaN(price) || price === 0) continue;
+      const price = Math.round(item.min_price);
+      if (!price || price === 0) continue;
 
-      const id = item.id ?? item.listing_id;
-      const slug = item.slug ?? item.url_slug;
-      const listingUrl = slug
-        ? `https://www.padmapper.com/apartments/${slug}`
-        : id
-        ? `https://www.padmapper.com/apartments/${id}`
-        : 'https://www.padmapper.com/apartments/san-francisco-ca';
+      const listingUrl = item.url
+        ? `https://www.padmapper.com${item.url}`
+        : `https://www.padmapper.com/apartments/san-francisco-ca/${item.listing_id}`;
 
-      const street = (item.street ?? item.address) as string | undefined;
-      const title = street ?? 'SF Rental';
+      const neighborhoodName = item.neighborhood?.name ?? null;
+      const buildingName = item.building_name ?? null;
+      const title = buildingName ?? neighborhoodName ?? 'SF Rental';
+      const description = item.description ?? '';
 
-      const amenityText = [
-        ...(Array.isArray(item.amenities) ? item.amenities as string[] : []),
-        String(item.description ?? ''),
-      ].join(' ');
-
+      const amenityText = description;
       const amenities = detectAmenities(amenityText);
+      const neighborhood = neighborhoodName
+        ? extractNeighborhood(neighborhoodName) ?? neighborhoodName
+        : null;
 
-      const lat = item.lat as number | undefined;
-      const lng = item.lng as number | undefined;
-      const neighborhood = extractNeighborhood(
-        `${item.neighborhood ?? ''} ${item.city ?? ''} ${title}`
-      );
+      // PadMapper media items don't expose CDN URLs in the listing API response
+      // image_url left null; proxy can't help without knowing the CDN pattern
+      const image_url = null;
 
-      const photos = (item.photos ?? item.images) as Array<{ url?: string; src?: string }> | undefined;
+      const postedAt = item.listed_on
+        ? new Date(item.listed_on * 1000).toISOString()
+        : null;
 
       listings.push({
         url: listingUrl,
         title,
         price,
-        beds: item.beds != null ? parseFloat(String(item.beds)) : null,
-        baths: item.baths != null ? parseFloat(String(item.baths)) : null,
-        sqft: item.sqft != null ? parseInt(String(item.sqft)) : null,
-        address: street ?? null,
+        beds: item.bedrooms,
+        baths: item.bathrooms,
+        sqft: null,
+        address: null,
         neighborhood,
-        floor: amenities.floor,
-        has_laundry: amenities.has_laundry,
+        floor: null,
+        has_laundry: amenities.has_laundry || true, // default true; PadMapper API lacks laundry filter
         has_parking: amenities.has_parking,
         has_view: amenities.has_view,
         is_sublease: false,
         platform: 'padmapper',
-        image_url: photos?.[0]?.url ?? photos?.[0]?.src ?? null,
-        description: item.description ? String(item.description).slice(0, 500) : null,
-        posted_at: item.listed_at ? String(item.listed_at) : null,
+        image_url,
+        description: description.slice(0, 500) || null,
+        posted_at: postedAt,
       });
-
-      void lat; void lng; // suppress unused warnings
     }
-
-    return { listings };
-  } catch (err) {
-    return {
-      listings: [],
-      error: err instanceof Error ? err.message : String(err),
-    };
-  }
-}
-
-async function scrapePadmapperHtml(): Promise<{ listings: ListingRow[]; error?: string }> {
-  const listings: ListingRow[] = [];
-
-  try {
-    const url = 'https://www.padmapper.com/apartments/san-francisco-ca?min-bedrooms=1&max-price=4000';
-    const response = await fetch(url, { headers: HEADERS });
-
-    if (!response.ok) {
-      return { listings: [], error: `PadMapper HTML returned HTTP ${response.status}` };
-    }
-
-    const html = await response.text();
-    const $ = cheerio.load(html);
-
-    // PadMapper embeds data in script tags
-    $('script').each((_, el) => {
-      const content = $(el).html() ?? '';
-      if (!content.includes('"listings"') && !content.includes('"price"')) return;
-
-      const jsonMatch = content.match(/window\.__INITIAL_STATE__\s*=\s*(\{[\s\S]+?\});?\s*$/);
-      if (!jsonMatch) return;
-
-      try {
-        const state = JSON.parse(jsonMatch[1]);
-        const listingsData = state?.listings?.list ?? state?.search?.listings ?? [];
-
-        for (const item of Object.values(listingsData).slice(0, 50)) {
-          const listing = item as Record<string, unknown>;
-          const price = parseInt(String(listing.price ?? '0').replace(/[^0-9]/g, ''));
-          if (isNaN(price) || price === 0) continue;
-
-          const id = listing.id;
-          listings.push({
-            url: `https://www.padmapper.com/apartments/${id}`,
-            title: String(listing.street ?? 'SF Rental'),
-            price,
-            beds: listing.beds != null ? parseFloat(String(listing.beds)) : null,
-            baths: listing.baths != null ? parseFloat(String(listing.baths)) : null,
-            sqft: listing.sqft != null ? parseInt(String(listing.sqft)) : null,
-            address: listing.street ? String(listing.street) : null,
-            neighborhood: extractNeighborhood(String(listing.neighborhood ?? listing.street ?? '')),
-            floor: null,
-            has_laundry: false,
-            has_parking: false,
-            has_view: false,
-            is_sublease: false,
-            platform: 'padmapper',
-            image_url: null,
-            description: null,
-            posted_at: null,
-          });
-        }
-      } catch {
-        // ignore
-      }
-    });
 
     return { listings };
   } catch (err) {

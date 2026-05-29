@@ -8,14 +8,14 @@ const SF_KEYWORDS = /san francisco|sf|soma|mission|castro|noe valley|pacific hei
 
 function parsePrice(text: string): number | null {
   const patterns = [
-    /\$([\d,]+)/,
+    /\$([\d,]+)\s*(?:\/mo|per\s*month|a\s*month|month)?/i,
     /([\d,]+)\s*(?:\/mo|per\s*month|a\s*month)/i,
   ];
   for (const pattern of patterns) {
     const match = text.match(pattern);
     if (match) {
       const val = parseInt(match[1].replace(/,/g, ''));
-      if (!isNaN(val) && val > 300 && val < 20000) return val;
+      if (!isNaN(val) && val > 300 && val < 15000) return val;
     }
   }
   return null;
@@ -71,17 +71,30 @@ async function scrapeSubreddit(subreddit: string): Promise<ListingRow[]> {
     const title = link.text.trim();
     if (!title) continue;
 
-    const fullText = title + ' ' + text;
-    if (!HOUSING_KEYWORDS.test(title) && !HOUSING_KEYWORDS.test(fullText.slice(0, 300))) continue;
-    if (!SF_KEYWORDS.test(fullText.slice(0, 500))) continue;
+    // Must have housing keywords in the title
+    if (!HOUSING_KEYWORDS.test(title)) continue;
 
-    const price = parsePrice(fullText.slice(0, 500));
+    // Must have SF keywords in the title (most reliable check since we only have title here)
+    if (!SF_KEYWORDS.test(title)) continue;
+
+    // Try to extract price from title first — much more reliable than searching page text
+    let price = parsePrice(title);
+    if (!price) {
+      // Fallback: search around the title in the page text blob
+      const escapedTitle = title.slice(0, 40).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      const re = new RegExp(escapedTitle + '[\\s\\S]{0,300}?\\$(\\d[\\d,]+)', 'i');
+      const m = text.match(re);
+      if (m) {
+        const val = parseInt(m[1].replace(/,/g, ''));
+        if (!isNaN(val) && val > 300 && val < 15000) price = val;
+      }
+    }
     if (!price) continue;
 
-    const isSublease = /sublease|sublet/i.test(fullText.slice(0, 300));
+    const isSublease = /sublease|sublet/i.test(title);
     const beds = parseBeds(title);
     const amenities = detectAmenities(title);
-    const neighborhood = extractNeighborhood(title) || extractNeighborhood(fullText.slice(0, 300));
+    const neighborhood = extractNeighborhood(title);
 
     listings.push({
       url: link.href,
@@ -93,7 +106,7 @@ async function scrapeSubreddit(subreddit: string): Promise<ListingRow[]> {
       address: null,
       neighborhood,
       floor: null,
-      has_laundry: amenities.has_laundry || true, // default true for SF housing subreddits
+      has_laundry: true, // default true for SF housing subreddits
       has_parking: amenities.has_parking,
       has_view: amenities.has_view,
       is_sublease: isSublease,
