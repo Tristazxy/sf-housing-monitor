@@ -50,6 +50,24 @@ function isSFListing(listing: ListingRow): boolean {
   return true;
 }
 
+/**
+ * Returns true if the listing looks like a room-for-rent or shared housing
+ * rather than a whole apartment unit.
+ */
+const ROOM_PATTERN = /\b(?:room(?:mate)?s?\s+(?:wanted|needed|for\s+rent|available)|private\s+room|shared\s+(?:room|house|apartment|apt)|master\s+(?:bed(?:room)?|suite)\s+for\s+rent|rent\s+a\s+room|looking\s+for\s+roommate|housemate)\b/i;
+
+function isRoomListing(listing: ListingRow): boolean {
+  const text = `${listing.title} ${listing.url}`.toLowerCase();
+  // Reject listings explicitly advertising a room or roommate situation
+  if (ROOM_PATTERN.test(listing.title)) return true;
+  // Reject Craigslist /roo/ URLs (rooms category)
+  if (/craigslist\.org\/sfc\/roo\//.test(listing.url)) return true;
+  // Reject Reddit posts mentioning "room" or "roommate" in title
+  if (/reddit\.com/.test(listing.url) && /\broom(?:mate)?\b/i.test(listing.title)) return true;
+  void text;
+  return false;
+}
+
 async function runScraper(
   name: string,
   fn: () => Promise<{ listings: ListingRow[]; error?: string }>
@@ -124,6 +142,9 @@ export function deduplicateListings(allResults: ScrapeResult[]): ListingRow[] {
     for (const listing of result.listings) {
       // Reject listings outside San Francisco city limits
       if (!isSFListing(listing)) continue;
+
+      // Reject room-for-rent / roommate / shared housing listings
+      if (isRoomListing(listing)) continue;
 
       // Normalize URL for deduplication
       const normalizedUrl = listing.url.replace(/\?.*$/, '').replace(/\/$/, '').toLowerCase();

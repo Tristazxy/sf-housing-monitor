@@ -3,7 +3,8 @@ import { browserNavigate, browserGetText, browserGetLinks } from '../browser-scr
 
 type ListingRow = Omit<Listing, 'id' | 'scraped_at' | 'is_new' | 'is_saved'>;
 
-const HOUSING_KEYWORDS = /apt|apartment|studio|1br|2br|bedroom|sublease|sublet|rent|rental|available|unit|room/i;
+const HOUSING_KEYWORDS = /apt|apartment|studio|2br|3br|2bed|3bed|2\s*bed|3\s*bed|2\s*bedroom|3\s*bedroom/i;
+const ROOM_EXCLUDE = /\broom(?:mate|s)?\s+(?:wanted|needed|for\s+rent|available)|\bprivate\s+room\b|\bshared\b|\bhousemate\b/i;
 const SF_KEYWORDS = /san francisco|sf|soma|mission|castro|noe valley|pacific heights|marina|north beach|tenderloin|hayes valley|haight|sunset|richmond|potrero|bernal|dogpatch|russian hill|nob hill|fillmore|twin peaks|embarcadero|south beach|mission bay|cow hollow/i;
 
 function parsePrice(text: string): number | null {
@@ -71,8 +72,9 @@ async function scrapeSubreddit(subreddit: string): Promise<ListingRow[]> {
     const title = link.text.trim();
     if (!title) continue;
 
-    // Must have housing keywords in the title
+    // Must have apartment-style keywords; reject room/roommate posts
     if (!HOUSING_KEYWORDS.test(title)) continue;
+    if (ROOM_EXCLUDE.test(title)) continue;
 
     // Must have SF keywords in the title (most reliable check since we only have title here)
     if (!SF_KEYWORDS.test(title)) continue;

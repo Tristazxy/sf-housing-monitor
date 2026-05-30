@@ -172,6 +172,7 @@ export async function scrapeCraigslist(): Promise<{ listings: ListingRow[]; erro
   const errors: string[] = [];
 
   try {
+    // /apa = apartments only (no rooms, no subleases)
     const apaListings = await scrapeSearchPage(
       'https://sfbay.craigslist.org/search/sfc/apa?min_bedrooms=2&max_price=6000&sort=date&laundry=1&private_room=0',
       false
@@ -180,16 +181,7 @@ export async function scrapeCraigslist(): Promise<{ listings: ListingRow[]; erro
   } catch (err) {
     errors.push(`apartments: ${err instanceof Error ? err.message : String(err)}`);
   }
-
-  try {
-    const subListings = await scrapeSearchPage(
-      'https://sfbay.craigslist.org/search/sfc/sub?min_bedrooms=2&max_price=6000&sort=date&laundry=1&private_room=0',
-      true
-    );
-    listings.push(...subListings);
-  } catch (err) {
-    errors.push(`subleases: ${err instanceof Error ? err.message : String(err)}`);
-  }
+  // /sub (subleases) and /roo (rooms) intentionally excluded — apartments only
 
   const seen = new Set<string>();
   const deduped = listings.filter(l => {
