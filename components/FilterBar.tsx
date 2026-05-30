@@ -14,6 +14,7 @@ interface FilterBarProps {
 
 const PLATFORM_LABELS: Record<string, string> = {
   craigslist: 'Craigslist',
+  reddit: 'Reddit',
   zillow: 'Zillow',
   'apartments.com': 'Apartments.com',
   hotpads: 'HotPads',

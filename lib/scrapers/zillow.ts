@@ -33,7 +33,7 @@ export async function scrapeZillow(): Promise<{ listings: ListingRow[]; error?: 
   const listings: ListingRow[] = [];
 
   try {
-    const url = 'https://www.zillow.com/san-francisco-ca/rentals/?price=0-4000&beds=0-1&amenities=laundryInUnit';
+    const url = 'https://www.zillow.com/san-francisco-ca/rentals/?price=0-6000&beds=2-2&amenities=laundryInUnit';
 
     const html = browserGetHtml(url);
     const $ = cheerio.load(html);

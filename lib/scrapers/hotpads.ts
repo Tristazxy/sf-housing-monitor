@@ -32,7 +32,7 @@ export async function scrapeHotpads(): Promise<{ listings: ListingRow[]; error?:
   const listings: ListingRow[] = [];
 
   try {
-    const apiUrl = 'https://hotpads.com/san-francisco-ca/apartments-for-rent?beds=1&maxPrice=4000&rental=true&laundry=in-unit';
+    const apiUrl = 'https://hotpads.com/san-francisco-ca/apartments-for-rent?beds=2&maxPrice=6000&rental=true&laundry=in-unit';
 
     const html = browserGetHtml(apiUrl);
     const $ = cheerio.load(html);

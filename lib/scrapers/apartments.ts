@@ -32,7 +32,7 @@ export async function scrapeApartments(): Promise<{ listings: ListingRow[]; erro
   const listings: ListingRow[] = [];
 
   try {
-    const url = 'https://www.apartments.com/san-francisco-ca/1-bedrooms-under-4000/?so=2&wr-dr=1';
+    const url = 'https://www.apartments.com/san-francisco-ca/2-bedrooms-under-6000/?so=2&wr-dr=1';
     const html = browserGetHtml(url);
     const $ = cheerio.load(html);
 

@@ -63,8 +63,8 @@ export async function scrapePadmapper(): Promise<{ listings: ListingRow[]; error
       },
       body: JSON.stringify({
         limit: 50,
-        min_beds: 1,
-        max_price: 4000,
+        min_beds: 2,
+        max_price: 6000,
         min_lat: 37.7080,
         max_lat: 37.8121,
         min_lng: -122.5149,

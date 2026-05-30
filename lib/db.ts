@@ -170,11 +170,19 @@ export function getListings(filters?: {
   if (filters?.require_laundry) {
     conditions.push('has_laundry = 1');
   }
+  // View: include listings where view is confirmed OR floor/view data unavailable
+  if (filters?.require_view) {
+    conditions.push('(has_view = 1 OR has_view IS NULL)');
+  }
+  // High floor: require floor >= 5 when known; pass through listings with no floor data
+  if (filters?.require_high_floor) {
+    conditions.push('(floor IS NULL OR floor >= 5)');
+  }
 
   // Always exclude high-crime neighborhoods
-  const EXCLUDED_NEIGHBORHOODS = ['Tenderloin', 'Civic', 'Van Ness', 'Visitacion Valley', 'Excelsior', 'Bayview'];
+  const EXCLUDED_NEIGHBORHOODS = ['tenderloin', 'civic', 'van ness', 'visitacion valley', 'excelsior', 'bayview'];
   const excludePlaceholders = EXCLUDED_NEIGHBORHOODS.map(() => '?').join(', ');
-  conditions.push(`(neighborhood IS NULL OR neighborhood NOT IN (${excludePlaceholders}))`);
+  conditions.push(`(neighborhood IS NULL OR LOWER(neighborhood) NOT IN (${excludePlaceholders}))`);
   params.push(...EXCLUDED_NEIGHBORHOODS);
 
   if (filters?.accept_subleases === false) {
@@ -182,8 +190,8 @@ export function getListings(filters?: {
   }
   if (filters?.neighborhoods && filters.neighborhoods.length > 0) {
     const placeholders = filters.neighborhoods.map(() => '?').join(', ');
-    conditions.push(`neighborhood IN (${placeholders})`);
-    params.push(...filters.neighborhoods);
+    conditions.push(`LOWER(neighborhood) IN (${placeholders})`);
+    params.push(...filters.neighborhoods.map(n => n.toLowerCase()));
   }
 
   const where = conditions.length > 0 ? `WHERE ${conditions.join(' AND ')}` : '';

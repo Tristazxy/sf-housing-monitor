@@ -9,13 +9,16 @@ export default function HomePage() {
 
   const activeCriteria = [
     `Up to $${settings.price_max.toLocaleString()}/mo`,
-    settings.beds_min > 0 ? `${settings.beds_min}+ bed` : 'Studio/1bd OK',
-    settings.baths_min > 0 ? `${settings.baths_min}+ bath` : null,
+    settings.beds_min > 0 ? `${settings.beds_min}BR` : 'Studio OK',
+    settings.baths_min > 0 ? `${settings.baths_min}BA` : null,
     settings.require_laundry ? 'In-unit laundry' : null,
-    settings.require_view ? 'View required' : null,
+    settings.require_view ? 'Views / glass windows' : null,
     settings.require_high_floor ? 'High floor (5+)' : null,
     settings.require_parking ? 'Parking' : null,
-    settings.accept_subleases ? 'Subleases OK' : null,
+    settings.accept_subleases ? null : 'No subleases',
+    settings.neighborhoods.length > 0
+      ? `Near Ferry Bldg: ${settings.neighborhoods.slice(0, 3).join(', ')}${settings.neighborhoods.length > 3 ? '…' : ''}`
+      : null,
   ].filter(Boolean);
 
   return (

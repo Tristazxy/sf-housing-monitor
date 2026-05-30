@@ -7,7 +7,7 @@ function detectAmenities(text: string) {
   const lower = text.toLowerCase();
   const has_laundry = /in.?unit laundry|washer.?dryer|w\/d in unit|w\/d\(|laundry in unit/.test(lower);
   const has_parking = /parking|garage|carport/.test(lower);
-  const has_view = /bay view|city view|ocean view|water view|panoramic|views/.test(lower);
+  const has_view = /bay view|city view|ocean view|water view|panoramic|views|floor.to.ceiling|glass window|floor-to-ceiling windows/.test(lower);
   let floor: number | null = null;
   const fm = lower.match(/(\d+)(?:st|nd|rd|th)?\s*floor/) || lower.match(/floor\s*(\d+)/);
   if (fm) floor = parseInt(fm[1]);
@@ -173,7 +173,7 @@ export async function scrapeCraigslist(): Promise<{ listings: ListingRow[]; erro
 
   try {
     const apaListings = await scrapeSearchPage(
-      'https://sfbay.craigslist.org/search/sfc/apa?min_bedrooms=0&max_price=4000&sort=date&laundry=1&private_room=0',
+      'https://sfbay.craigslist.org/search/sfc/apa?min_bedrooms=2&max_price=6000&sort=date&laundry=1&private_room=0',
       false
     );
     listings.push(...apaListings);
@@ -183,7 +183,7 @@ export async function scrapeCraigslist(): Promise<{ listings: ListingRow[]; erro
 
   try {
     const subListings = await scrapeSearchPage(
-      'https://sfbay.craigslist.org/search/sfc/sub?min_bedrooms=0&max_price=4000&sort=date&laundry=1&private_room=0',
+      'https://sfbay.craigslist.org/search/sfc/sub?min_bedrooms=2&max_price=6000&sort=date&laundry=1&private_room=0',
       true
     );
     listings.push(...subListings);
