@@ -2,7 +2,7 @@ import * as cheerio from 'cheerio';
 import { Listing } from '../types';
 import { browserGetHtml } from '../browser-scraper';
 
-type ListingRow = Omit<Listing, 'id' | 'scraped_at' | 'is_new'>;
+type ListingRow = Omit<Listing, 'id' | 'scraped_at' | 'is_new' | 'is_saved'>;
 
 function detectAmenities(text: string): { has_laundry: boolean; has_parking: boolean; has_view: boolean; floor: number | null } {
   const lower = text.toLowerCase();

@@ -1,7 +1,7 @@
 import { Listing } from '../types';
 import { browserNavigate, browserGetText, browserGetLinks } from '../browser-scraper';
 
-type ListingRow = Omit<Listing, 'id' | 'scraped_at' | 'is_new'>;
+type ListingRow = Omit<Listing, 'id' | 'scraped_at' | 'is_new' | 'is_saved'>;
 
 const HOUSING_KEYWORDS = /apt|apartment|studio|1br|2br|bedroom|sublease|sublet|rent|rental|available|unit|room/i;
 const SF_KEYWORDS = /san francisco|sf|soma|mission|castro|noe valley|pacific heights|marina|north beach|tenderloin|hayes valley|haight|sunset|richmond|potrero|bernal|dogpatch|russian hill|nob hill|fillmore|twin peaks|embarcadero|south beach|mission bay|cow hollow/i;

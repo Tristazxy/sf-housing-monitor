@@ -1,6 +1,6 @@
 import { Listing } from '../types';
 
-type ListingRow = Omit<Listing, 'id' | 'scraped_at' | 'is_new'>;
+type ListingRow = Omit<Listing, 'id' | 'scraped_at' | 'is_new' | 'is_saved'>;
 
 const HEADERS = {
   'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',

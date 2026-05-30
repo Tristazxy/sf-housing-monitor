@@ -4,9 +4,12 @@ import { scrapeApartments } from './apartments';
 import { scrapeHotpads } from './hotpads';
 import { scrapePadmapper } from './padmapper';
 import { scrapeReddit } from './reddit';
+import { scrapeZumper } from './zumper';
+import { scrapeRedfin } from './redfin';
+import { scrapeRentCafe } from './rentcafe';
 import { ScrapeResult, Listing } from '../types';
 
-type ListingRow = Omit<Listing, 'id' | 'scraped_at' | 'is_new'>;
+type ListingRow = Omit<Listing, 'id' | 'scraped_at' | 'is_new' | 'is_saved'>;
 
 // Cities that are NOT San Francisco — reject listings whose address names these
 const NON_SF_CITIES = [
@@ -92,6 +95,9 @@ export async function runAllScrapers(): Promise<ScrapeResult[]> {
     { name: 'zillow', fn: scrapeZillow },
     { name: 'apartments.com', fn: scrapeApartments },
     { name: 'hotpads', fn: scrapeHotpads },
+    { name: 'zumper', fn: scrapeZumper },
+    { name: 'redfin', fn: scrapeRedfin },
+    { name: 'rentcafe', fn: scrapeRentCafe },
   ];
 
   for (const { name, fn } of browserScrapers) {
@@ -110,7 +116,7 @@ export function deduplicateListings(allResults: ScrapeResult[]): ListingRow[] {
 
   // Sort results: prefer craigslist first (most reliable), then others
   const sorted = [...allResults].sort((a, b) => {
-    const order = ['craigslist', 'reddit', 'zillow', 'apartments.com', 'hotpads', 'padmapper'];
+    const order = ['craigslist', 'reddit', 'zillow', 'apartments.com', 'hotpads', 'padmapper', 'zumper', 'redfin', 'rentcafe'];
     return order.indexOf(a.platform) - order.indexOf(b.platform);
   });
 

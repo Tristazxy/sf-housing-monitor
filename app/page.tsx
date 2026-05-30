@@ -19,6 +19,7 @@ export default function HomePage() {
     settings.neighborhoods.length > 0
       ? `Near Ferry Bldg: ${settings.neighborhoods.slice(0, 3).join(', ')}${settings.neighborhoods.length > 3 ? '…' : ''}`
       : null,
+    settings.lease_start ? `Move-in: ${settings.lease_start.charAt(0).toUpperCase() + settings.lease_start.slice(1)}` : null,
   ].filter(Boolean);
 
   return (

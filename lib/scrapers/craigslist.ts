@@ -1,7 +1,7 @@
 import { Listing } from '../types';
 import { browserNavigate, browserGetText, browserGetLinks, browserGetCurrentHtml, browserRunJS, browserSleep } from '../browser-scraper';
 
-type ListingRow = Omit<Listing, 'id' | 'scraped_at' | 'is_new'>;
+type ListingRow = Omit<Listing, 'id' | 'scraped_at' | 'is_new' | 'is_saved'>;
 
 function detectAmenities(text: string) {
   const lower = text.toLowerCase();

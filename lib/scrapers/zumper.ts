@@ -7,9 +7,9 @@ type ListingRow = Omit<Listing, 'id' | 'scraped_at' | 'is_new' | 'is_saved'>;
 function detectAmenities(text: string): { has_laundry: boolean; has_parking: boolean; has_view: boolean; floor: number | null } {
   const lower = text.toLowerCase();
   return {
-    has_laundry: /in.?unit laundry|washer.?dryer|w\/d/.test(lower),
+    has_laundry: /in.?unit laundry|washer.?dryer|w\/d|laundry in unit|in.?unit w\/d/.test(lower),
     has_parking: /parking|garage/.test(lower),
-    has_view: /bay view|city view|view/.test(lower),
+    has_view: /bay view|city view|water view|panoramic|floor.to.ceiling|views/.test(lower),
     floor: null,
   };
 }
@@ -20,7 +20,7 @@ function extractNeighborhood(text: string): string | null {
     'North Beach', 'Financial District', 'Tenderloin', 'Hayes Valley',
     'Haight', 'Sunset', 'Richmond', 'Potrero', 'Bernal', 'Dogpatch',
     'Russian Hill', 'Nob Hill', 'Fillmore', 'Twin Peaks', 'Embarcadero',
-    'South Beach', 'Mission Bay',
+    'South Beach', 'Mission Bay', 'Rincon Hill', 'Glen Park',
   ];
   for (const n of sfNeighborhoods) {
     if (text.includes(n)) return n;
@@ -28,74 +28,85 @@ function extractNeighborhood(text: string): string | null {
   return null;
 }
 
-export async function scrapeHotpads(): Promise<{ listings: ListingRow[]; error?: string }> {
+export async function scrapeZumper(): Promise<{ listings: ListingRow[]; error?: string }> {
   const listings: ListingRow[] = [];
 
   try {
-    const apiUrl = 'https://hotpads.com/san-francisco-ca/apartments-for-rent?beds=2&maxPrice=6000&rental=true&laundry=in-unit';
-
-    const html = browserGetHtml(apiUrl);
+    const url = 'https://www.zumper.com/apartments-for-rent/san-francisco-ca?min_price=0&max_price=6000&beds=2&amenities=laundry_in_unit';
+    const html = browserGetHtml(url);
     const $ = cheerio.load(html);
 
-    // Try to find __NEXT_DATA__ or embedded JSON
+    // Zumper uses __NEXT_DATA__ with listing data
     const scriptContent = $('script#__NEXT_DATA__').text();
     if (scriptContent) {
       const data = JSON.parse(scriptContent);
-
-      // Navigate HotPads data structure
       const props = data?.props?.pageProps ?? {};
-      const searchResults = props?.listings ?? props?.searchResults ?? props?.data?.listings ?? [];
 
-      const items = Array.isArray(searchResults) ? searchResults : Object.values(searchResults);
+      // Zumper embeds listings in various paths
+      const listingsData =
+        props?.listings ??
+        props?.initialReduxState?.listings?.paginatedListings?.listings ??
+        props?.initialState?.listings?.listings ??
+        [];
 
-      for (const item of (items as Record<string, unknown>[]).slice(0, 50)) {
-        const priceStr = item.price ?? item.rentedPrice ?? item.minPrice;
-        const price = parseInt(String(priceStr).replace(/[^0-9]/g, ''));
+      const items = Array.isArray(listingsData) ? listingsData : Object.values(listingsData);
+
+      for (const item of (items as Record<string, unknown>[]).slice(0, 60)) {
+        const priceStr = item.price ?? item.listed_price ?? item.rent;
+        const price = parseInt(String(priceStr ?? '0').replace(/[^0-9]/g, ''));
         if (isNaN(price) || price === 0) continue;
 
-        const title = String(item.alias ?? item.street ?? (item.address as Record<string, unknown>)?.street ?? 'SF Rental');
-        const listingUrl = item.url
-          ? `https://hotpads.com${item.url}`
-          : `https://hotpads.com/san-francisco-ca/apartments-for-rent`;
+        const id = item.id ?? item.listingId;
+        const slug = item.slug ?? item.url_slug;
+        const listingUrl = slug
+          ? `https://www.zumper.com/apartments-for-rent/${slug}`
+          : id
+          ? `https://www.zumper.com/l/p${id}`
+          : null;
+        if (!listingUrl) continue;
 
-        const amenityText = [
-          ...((item.amenities as string[]) ?? []),
-          ...((item.features as string[]) ?? []),
-          String(item.description ?? ''),
-        ].join(' ');
+        const street = String(item.street ?? item.address ?? '');
+        const city = String(item.city ?? '');
+        const title = street || city || 'SF Rental';
 
+        const amenityList = (item.amenities as string[] | undefined) ?? [];
+        const amenityText = [...amenityList, String(item.description ?? '')].join(' ');
         const amenities = detectAmenities(amenityText);
+
         const neighborhood = extractNeighborhood(
-          `${item.neighborhood ?? ''} ${(item.address as Record<string, unknown>)?.city ?? ''} ${title}`
+          `${item.neighborhood ?? ''} ${item.area ?? ''} ${title}`
         );
+
+        const photos = (item.photos ?? item.images) as Array<{ url?: string; src?: string }> | undefined;
+        const imageUrl = photos?.[0]?.url ?? photos?.[0]?.src ?? null;
 
         listings.push({
           url: listingUrl,
           title,
           price,
-          beds: (item.beds ?? item.bedrooms ?? null) as number | null,
-          baths: (item.baths ?? item.bathrooms ?? null) as number | null,
-          sqft: (item.sqft ?? item.squareFeet ?? null) as number | null,
-          address: String((item.address as Record<string, unknown>)?.street ?? title),
+          beds: item.beds != null ? parseFloat(String(item.beds)) : null,
+          baths: item.baths != null ? parseFloat(String(item.baths)) : null,
+          sqft: item.sqft != null ? parseInt(String(item.sqft)) : null,
+          address: street || null,
           neighborhood,
-          floor: amenities.floor,
-          has_laundry: true, // URL filtered with laundry=in-unit
+          floor: null,
+          has_laundry: true, // URL filtered with amenities=laundry_in_unit
           has_parking: amenities.has_parking,
           has_view: amenities.has_view,
           is_sublease: false,
-          platform: 'hotpads',
-          image_url: ((item.photos as Array<Record<string, unknown>>)?.[0]?.url ?? item.imageUrl ?? null) as string | null,
+          platform: 'zumper',
+          image_url: imageUrl as string | null,
           description: item.description ? String(item.description).slice(0, 500) : null,
-          posted_at: (item.availableDate ?? item.listedDate ?? null) as string | null,
+          posted_at: item.available_date ? String(item.available_date) : null,
         });
       }
     }
 
-    // DOM fallback
+    // DOM fallback — Zumper listing cards
     if (listings.length === 0) {
-      $('[data-testid="listing-card"], [class*="ListingCard"]').each((_, el) => {
+      $('[data-tid="listing-card"], [class*="ListingCard"], article[class*="listing"]').each((_, el) => {
         const $el = $(el);
-        const priceText = $el.find('[class*="price"], [data-testid*="price"]').first().text();
+        const priceText = $el.find('[class*="price"], [data-tid*="price"]').first().text();
         const price = parseInt(priceText.replace(/[^0-9]/g, ''));
         if (isNaN(price) || price === 0) return;
 
@@ -103,7 +114,7 @@ export async function scrapeHotpads(): Promise<{ listings: ListingRow[]; error?:
         const href = $el.find('a').first().attr('href');
         if (!href) return;
 
-        const listingUrl = href.startsWith('http') ? href : `https://hotpads.com${href}`;
+        const listingUrl = href.startsWith('http') ? href : `https://www.zumper.com${href}`;
         const imgUrl = $el.find('img').first().attr('src') ?? null;
         const detailText = $el.text();
         const bedsMatch = detailText.match(/(\d+)\s*(?:bd|bed)/i);
@@ -119,11 +130,11 @@ export async function scrapeHotpads(): Promise<{ listings: ListingRow[]; error?:
           address: title,
           neighborhood: extractNeighborhood(title),
           floor: null,
-          has_laundry: true, // URL filtered with laundry=in-unit
+          has_laundry: true,
           has_parking: false,
           has_view: false,
           is_sublease: false,
-          platform: 'hotpads',
+          platform: 'zumper',
           image_url: imgUrl,
           description: null,
           posted_at: null,

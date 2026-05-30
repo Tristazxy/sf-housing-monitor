@@ -19,6 +19,9 @@ const PLATFORM_LABELS: Record<string, string> = {
   'apartments.com': 'Apartments.com',
   hotpads: 'HotPads',
   padmapper: 'PadMapper',
+  zumper: 'Zumper',
+  redfin: 'Redfin',
+  rentcafe: 'RentCafe',
 };
 
 export default function FilterBar({

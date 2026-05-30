@@ -22,6 +22,9 @@ export interface Listing {
   is_saved: boolean;
 }
 
+// Scrapers produce this — DB fields (id, scraped_at, is_new, is_saved) added on insert
+export type ListingRow = Omit<Listing, 'id' | 'scraped_at' | 'is_new' | 'is_saved'>;
+
 export interface Settings {
   price_min: number;
   price_max: number;
@@ -33,6 +36,7 @@ export interface Settings {
   require_view: boolean;
   neighborhoods: string[];
   accept_subleases: boolean;
+  lease_start: string | null; // e.g. "september"
   scrape_interval: number; // minutes
 }
 
@@ -47,6 +51,7 @@ export const DEFAULT_SETTINGS: Settings = {
   require_view: true,
   neighborhoods: [],
   accept_subleases: true,
+  lease_start: null,
   scrape_interval: 30,
 };
 
@@ -102,7 +107,7 @@ export const SF_NEIGHBORHOODS = [
 
 export interface ScrapeResult {
   platform: string;
-  listings: Omit<Listing, 'id' | 'scraped_at' | 'is_new'>[];
+  listings: ListingRow[];
   error?: string;
   count: number;
 }

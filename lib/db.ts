@@ -1,7 +1,7 @@
 import Database from 'better-sqlite3';
 import path from 'path';
 import fs from 'fs';
-import { Settings, DEFAULT_SETTINGS, Listing } from './types';
+import { Settings, DEFAULT_SETTINGS, Listing, ListingRow } from './types';
 
 const DB_DIR = path.join(process.cwd(), 'data');
 const DB_PATH = path.join(DB_DIR, 'housing.db');
@@ -106,6 +106,7 @@ export function getSettings(): Settings {
       settings.neighborhoods = [];
     }
   }
+  if (map.lease_start !== undefined) settings.lease_start = map.lease_start;
 
   return settings;
 }
@@ -213,7 +214,7 @@ export function getListings(filters?: {
   })) as Listing[];
 }
 
-export function upsertListings(listings: Omit<Listing, 'id' | 'scraped_at' | 'is_new'>[]): number {
+export function upsertListings(listings: ListingRow[]): number {
   const db = getDb();
   const now = new Date().toISOString();
 
@@ -243,7 +244,7 @@ export function upsertListings(listings: Omit<Listing, 'id' | 'scraped_at' | 'is
   `);
 
   let inserted = 0;
-  const insertMany = db.transaction((items: Omit<Listing, 'id' | 'scraped_at' | 'is_new'>[]) => {
+  const insertMany = db.transaction((items: ListingRow[]) => {
     for (const item of items) {
       // Check if URL already exists
       const existing = db.prepare('SELECT id FROM listings WHERE url = ?').get(item.url);
