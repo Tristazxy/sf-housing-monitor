@@ -308,52 +308,6 @@ export default function ListingsGrid() {
         </div>
       )}
 
-      {/* Manual platforms section */}
-      <div className="mt-10">
-        <h2 className="text-sm font-semibold text-slate-500 uppercase tracking-wider mb-3">Check manually (login required)</h2>
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-          <a
-            href="https://www.facebook.com/marketplace/sanfrancisco/propertyrentals"
-            target="_blank"
-            rel="noopener noreferrer"
-            className="flex items-center gap-3 border border-dashed border-slate-700 rounded-xl px-4 py-3 hover:border-slate-500 hover:bg-slate-800/40 transition-colors group"
-          >
-            <div className="w-8 h-8 rounded-lg bg-blue-500/10 flex items-center justify-center shrink-0">
-              <svg className="w-4 h-4 text-blue-400" fill="currentColor" viewBox="0 0 24 24">
-                <path d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z" />
-              </svg>
-            </div>
-            <div className="min-w-0">
-              <p className="text-sm font-medium text-slate-300 group-hover:text-white transition-colors">Facebook Marketplace SF</p>
-              <p className="text-xs text-slate-500">Rentals &amp; rooms</p>
-            </div>
-            <svg className="w-4 h-4 text-slate-600 group-hover:text-slate-400 ml-auto shrink-0 transition-colors" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
-            </svg>
-          </a>
-
-          <a
-            href="https://nextdoor.com/for_sale_and_free/"
-            target="_blank"
-            rel="noopener noreferrer"
-            className="flex items-center gap-3 border border-dashed border-slate-700 rounded-xl px-4 py-3 hover:border-slate-500 hover:bg-slate-800/40 transition-colors group"
-          >
-            <div className="w-8 h-8 rounded-lg bg-green-500/10 flex items-center justify-center shrink-0">
-              <svg className="w-4 h-4 text-green-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" />
-              </svg>
-            </div>
-            <div className="min-w-0">
-              <p className="text-sm font-medium text-slate-300 group-hover:text-white transition-colors">Nextdoor</p>
-              <p className="text-xs text-slate-500">Neighborhood rentals &amp; rooms</p>
-            </div>
-            <svg className="w-4 h-4 text-slate-600 group-hover:text-slate-400 ml-auto shrink-0 transition-colors" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
-            </svg>
-          </a>
-        </div>
-      </div>
-
       {/* Polling indicator */}
       <div className="mt-8 text-center text-xs text-slate-600">
         Auto-refreshes every 5 minutes • {lastCount} listings in DB

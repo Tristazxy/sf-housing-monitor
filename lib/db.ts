@@ -8,7 +8,7 @@ const DB_PATH = path.join(DB_DIR, 'housing.db');
 
 let db: Database.Database | null = null;
 
-function getDb(): Database.Database {
+export function getDb(): Database.Database {
   if (db) return db;
 
   if (!fs.existsSync(DB_DIR)) {
